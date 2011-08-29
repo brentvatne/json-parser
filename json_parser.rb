@@ -1,66 +1,64 @@
+require 'strscan'
 class JSONParser
-
-  def initialize
-
-  end
+  AST = Struct.new(:value)
 
   def parse(json_string)
-    case 
-    when json_string == "true"
-      true
-    when json_string == "false"
-      false
-    when json_string == "null"
-      nil
-    when float?(json_string)
-      Float(json_string)
-    when integer?(json_string)
-      Integer(json_string)
-    when string?(json_string)
-      json_string[1..-2].gsub(/\\(?=")/,"").gsub(/\\n/,"\n")
-    when array?(json_string)
-      #todo: split it better!
-      json_string[1..-2].split(/,\s*/).map do |str|
-        parse(str)
-      end
-    when hash?(json_string)
-      #other thing
-    else
-      raise RuntimeError, json_string
+    @str_scanner = StringScanner.new(json_string)
+    val = do_parsing
+    unless @str_scanner.eos?
+      raise(RuntimeError, "%s :: %s" % [json_string, @str_scanner.post_match])
+    end
+    val
+  end
+
+  def do_parsing
+    val = parse_object    ||
+            parse_array   ||
+            parse_string  ||
+            parse_float   ||
+            parse_int     ||
+            parse_literal
+    val.value if val
+  end
+
+  def parse_object
+#     return nil unless @str_scanner.scan(/^{/)
+  end
+
+  def parse_array
+    return nil unless @str_scanner.scan(/^\[/)
+    new_array = []
+    while !@str_scanner.scan(/^\]/)
+      next_object = do_parsing
+
+      raise RuntimeError unless next_object
+      new_array << next_object
+      @str_scanner.scan(/^,\s*/)
+    end
+    AST.new( new_array )
+  end
+
+  def parse_string
+    if str = @str_scanner.scan(/^"([^"]|\\")*[^\\]"/) || @str_scanner.scan(/^""/)
+      AST.new( str[1..-2].gsub(/\\"/,'"').gsub(/\\n/,"\n") )
     end
   end
 
-  # { "key" => value (string, integer, boolean/null), .. }
-  # [ " ", 11, true/false/null ]
-#  def begin_string?
-#  def consume_string
-
-  def array?(str)
-    array_regexp = /^\[.*\]$/
-    str.match(array_regexp)
+  def parse_int
+    if int = @str_scanner.scan(/-?[0-9]+/)
+      AST.new( Integer(int) )
+    end
   end
 
-  # "something": "something"
-  def hash?(str)
-    str.match(/^{.*}$/)
+  def parse_float
+    if float = @str_scanner.scan(/-?[0-9]+\.[0-9]*(e[-+]?)?[0-9]+/)
+      AST.new( Float(float) )
+    end
   end
 
-  def string?(str)
-    #start with a quote, end with a quote, and inside quotes are escaped
-    # "nested \"quotes\""
-    json_string_regexp = /^"([^"]|\\")*"$/
-    str.match(json_string_regexp)
-  end
-
-  def float?(str)
-    Float(str) && str =~ /^[0-9eE\+\.-]*$/
-    rescue ArgumentError
-      false
-  end
-
-  def integer?(str)
-    Integer(str) && str =~ /^[0-9eE\+\.-]*$/
-    rescue ArgumentError
-      false
+  def parse_literal
+    return AST.new( true )  if @str_scanner.scan(/true/)
+    return AST.new( false ) if @str_scanner.scan(/false/)
+    return AST.new( nil )   if @str_scanner.scan(/null/)
   end
 end
