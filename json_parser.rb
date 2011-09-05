@@ -6,23 +6,34 @@ class JSONParser
     @str_scanner = StringScanner.new(json_string)
     val = do_parsing
     unless @str_scanner.eos?
-      raise(RuntimeError, "%s :: %s" % [json_string, @str_scanner.post_match])
+      raise(RuntimeError, "%s :: %s" % [json_string, @str_scanner.rest])
     end
     val
   end
 
   def do_parsing
-    val = parse_object    ||
-            parse_array   ||
-            parse_string  ||
-            parse_float   ||
-            parse_int     ||
-            parse_literal
+    val = parse_object  ||
+          parse_array   ||
+          parse_string  ||
+          parse_float   ||
+          parse_int     ||
+          parse_literal
+
     val.value if val
   end
 
   def parse_object
-#     return nil unless @str_scanner.scan(/^{/)
+     return nil unless @str_scanner.scan(/^{/)
+     new_object = {}
+     while !@str_scanner.scan(/^\}/)
+      key = parse_string
+      @str_scanner.scan(/\s*:\s*/)
+      val = do_parsing
+      raise RuntimeError, new_object.inspect unless key and val
+      new_object[key.value] = val
+      @str_scanner.scan(/^,\s*/)
+     end 
+     AST.new( new_object )
   end
 
   def parse_array
@@ -39,8 +50,23 @@ class JSONParser
   end
 
   def parse_string
-    if str = @str_scanner.scan(/^"([^"]|\\")*[^\\]"/) || @str_scanner.scan(/^""/)
-      AST.new( str[1..-2].gsub(/\\"/,'"').gsub(/\\n/,"\n") )
+    return nil unless @str_scanner.scan(/"/)
+    str = ""
+    while content = parse_normal_string
+      str += content
+    end
+    raise RuntimeError, @str_scanner.rest unless @str_scanner.scan(/"/)
+    new_str = str.gsub(/\\n/,"\n").gsub(/\\/,"") 
+    AST.new( new_str )
+  end
+
+  def parse_normal_string
+    @str_scanner.scan(/(\\{1}")|([^"])/) 
+  end
+
+  def parse_escaped_string
+    if escaped = @str_scanner.scan(/\\[ri]/)
+      AST.new(eval(%Q{"#{escaped}"}))
     end
   end
 
