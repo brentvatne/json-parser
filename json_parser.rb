@@ -52,23 +52,12 @@ class JSONParser
   def parse_string
     return nil unless @str_scanner.scan(/"/)
     str = ""
-    while content = parse_normal_string
+    while content = @str_scanner.scan(/(\\{1}")|([^"])/)
       str += content
     end
-    raise RuntimeError, @str_scanner.rest if str.match(/\\[^"\\bfnrt]/)
-    raise RuntimeError, @str_scanner.rest unless @str_scanner.scan(/"/)
+    raise RuntimeError, @str_scanner.rest if !(@str_scanner.scan(/"/)) or str.match(/\\[^"\\bfnrt]/)
     new_str = str.gsub(/\\n/,"\n").gsub(/\\/,"") 
     AST.new( new_str )
-  end
-
-  def parse_normal_string
-    @str_scanner.scan(/(\\{1}")|([^"])/) 
-  end
-
-  def parse_escaped_string
-    if escaped = @str_scanner.scan(/\\[ri]/)
-      AST.new(eval(%Q{"#{escaped}"}))
-    end
   end
 
   def parse_int
