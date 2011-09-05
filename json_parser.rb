@@ -55,6 +55,7 @@ class JSONParser
     while content = parse_normal_string
       str += content
     end
+    raise RuntimeError, @str_scanner.rest if str.match(/\\[^"\\bfnrt]/)
     raise RuntimeError, @str_scanner.rest unless @str_scanner.scan(/"/)
     new_str = str.gsub(/\\n/,"\n").gsub(/\\/,"") 
     AST.new( new_str )

@@ -58,7 +58,7 @@ class TestJSONParser < Test::Unit::TestCase
     assert_raise(RuntimeError) { @parser.parse("[1,,2]") }
 
     assert_raise(RuntimeError) { @parser.parse(%Q{"}) }
-#    assert_raise(RuntimeError) { @parser.parse(%Q{"\\i"}) }
+    assert_raise(RuntimeError) { @parser.parse(%Q{"\\i"}) }
 
     assert_raise(RuntimeError) { @parser.parse("$1,000") }
     assert_raise(RuntimeError) { @parser.parse("1_000") }
